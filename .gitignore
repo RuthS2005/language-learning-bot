@@ -1,0 +1,9 @@
+# Ignore the .env file that contains sensitive information
+.env
+
+# Environment variables for the language learning bot
+venv/
+__pycache__/
+
+# Ignore audio files    
+*.wav
