@@ -53,7 +53,7 @@ response = None
 for attempt in range(1, max_retries + 1):
     try:
         response = client.models.generate_content(
-            model="gemini-3.8-flash",
+            model="gemini-1.5-flash",
             contents=[
                 audio_file,
                 system_prompt

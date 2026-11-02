@@ -5,6 +5,11 @@ from google import genai
 from google.genai import types
 from google.genai import errors
 from pydantic import BaseModel
+from gtts import gTTS
+import pygame
+
+# אתחול מנוע השמע
+pygame.mixer.init()
 
 # 1. טעינת משתני סביבה ולקוח
 load_dotenv()
@@ -20,9 +25,20 @@ class ConversationAnalysis(BaseModel):
     grammar_explanation: str   
     next_question: str         
 
-# 3. פונקציית העיבוד המוגנת
+def speak_text(text):
+    """פונקציה שממירה טקסט לקול ומשמיעה אותו"""
+    try:
+        filename = "temp_speech.mp3"
+        tts = gTTS(text=text, lang='en')
+        tts.save(filename)
+        
+        pygame.mixer.music.load(filename)
+        pygame.mixer.music.play()
+    except Exception as e:
+        print(f"⚠️ שגיאה בהשמעת קול: {e}")
+
+# 3. פונקציית העיבוד המרכזית
 def process_audio(audio_filepath, history):
-    # אתחול היסטוריה נקי
     if history is None:
         history = []
 
@@ -32,7 +48,6 @@ def process_audio(audio_filepath, history):
     target_language = "English"
     native_language = "Hebrew"
 
-    # הרכבת ה-Context
     history_context = ""
     for msg in history:
         role = "User" if msg.get("role") == "user" else "Bot"
@@ -55,7 +70,6 @@ def process_audio(audio_filepath, history):
     """
 
     try:
-        print("🎙️ מעבד שמע...")
         with open(audio_filepath, "rb") as f:
             audio_bytes = f.read()
 
@@ -64,7 +78,6 @@ def process_audio(audio_filepath, history):
             mime_type="audio/wav"
         )
 
-        print("📡 פונה ל-Gemini API...")
         response = client.models.generate_content(
             model="gemini-3.8-flash",
             contents=[audio_part, system_prompt],
@@ -73,7 +86,6 @@ def process_audio(audio_filepath, history):
                 "response_schema": ConversationAnalysis,
             }
         )
-        print("✅ התקבלה תשובה מ-Gemini!")
         
         analysis = ConversationAnalysis.model_validate_json(response.text)
 
@@ -87,18 +99,18 @@ def process_audio(audio_filepath, history):
         
         bot_response_text += f"💬 **השאלה הבאה:** {analysis.next_question}"
 
-        # הוספת התור החדש להיסטוריה
         new_history = list(history)
         new_history.append({"role": "user", "content": analysis.transcribed_text})
         new_history.append({"role": "assistant", "content": bot_response_text})
 
-        return new_history, new_history, "✅ הבדיקה הושלמה בהצלחה!"
+        # השמעת שאלת ההמשך בקול!
+        speak_text(analysis.next_question)
+
+        return new_history, new_history, "✅ התקבלה תשובה!"
 
     except errors.ServerError:
-        print("❌ שגיאת שרת (503)")
         return history, history, "⚠️ השרת עמוס כרגע, נסה שוב בעוד כמה שניות."
     except Exception as e:
-        print(f"❌ שגיאה: {str(e)}")
         return history, history, f"❌ שגיאה: {str(e)}"
 
 # 4. הממשק הויזואלי
@@ -111,7 +123,7 @@ with gr.Blocks(title="AI Language Tutor") as demo:
         with gr.Column(scale=1):
             audio_input = gr.Audio(sources=["microphone"], type="filepath", label="הקלטת שמע")
             submit_btn = gr.Button("שלח לבדיקה 🚀", variant="primary")
-            status_output = gr.Textbox(label="סטטוס / לוגים", interactive=False)
+            status_output = gr.Textbox(label="סטטוס", interactive=False)
         
         with gr.Column(scale=2):
             chatbot_ui = gr.Chatbot(label="היסטוריית השיחה")
@@ -120,9 +132,9 @@ with gr.Blocks(title="AI Language Tutor") as demo:
         fn=process_audio,
         inputs=[audio_input, conversation_state],
         outputs=[chatbot_ui, conversation_state, status_output],
-        concurrency_limit=1  # מונע כפילות בקשות ותקיעות תורים
+        concurrency_limit=1
     )
 
 if __name__ == "__main__":
-    demo.queue()  # מפעיל תור בקשות יציב ב-Gradio
+    demo.queue()
     demo.launch()

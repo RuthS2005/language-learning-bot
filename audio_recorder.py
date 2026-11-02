@@ -2,7 +2,7 @@ import sounddevice as sd
 from scipy.io.wavfile import write
 import numpy as np
 
-def record_audio(filename="user_input.wav", duration=10, fs=44100):
+def record_audio(filename="user_input.wav", duration=20, fs=44100):
     """
     מקליטה שמע מהמיקרופון לשירות קובץ WAV.
     :param filename: שם הקובץ לשמירה
